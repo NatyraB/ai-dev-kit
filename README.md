@@ -28,12 +28,47 @@ databricks-mcp-server/            # MCP protocol wrapper
 pip install -e databricks-mcp-core
 pip install -e databricks-mcp-server
 
-# Set profile
+# Configure authentication (use your Databricks profile)
 export DATABRICKS_CONFIG_PROFILE=your-profile
+# or set DATABRICKS_HOST and DATABRICKS_TOKEN
 
-# Run server
+# Run MCP server
 python -m databricks_mcp_server.server
 ```
+
+## Quickstart
+
+### Using the MCP Server with Claude Code
+
+1. Start the server: `python -m databricks_mcp_server.server`
+2. Configure Claude Code (add to MCP settings - see below)
+3. Ask Claude to list your catalogs, create tables, run pipelines, etc.
+
+### Using the Core Library Directly
+
+```python
+from databricks_mcp_core.unity_catalog import catalogs, schemas, tables
+from databricks.sdk.service.catalog import ColumnInfo, TableType
+
+# List catalogs (returns List[CatalogInfo])
+all_catalogs = catalogs.list_catalogs()
+for catalog in all_catalogs:
+    print(catalog.name)
+
+# Create a table (returns TableInfo)
+table = tables.create_table(
+    catalog_name="main",
+    schema_name="default",
+    table_name="my_table",
+    columns=[
+        ColumnInfo(name="id", type_name="INT"),
+        ColumnInfo(name="name", type_name="STRING")
+    ],
+    table_type=TableType.MANAGED
+)
+```
+
+All functions use the official `databricks-sdk` and handle authentication automatically.
 
 ## Available Tools (33)
 
@@ -84,7 +119,7 @@ Then ask Claude to interact with your Databricks workspace!
 
 | Package | License | Copyright |
 |---------|---------|-----------|
-| [requests](https://github.com/psf/requests) | Apache License 2.0 | Copyright Kenneth Reitz |
+| [databricks-sdk](https://github.com/databricks/databricks-sdk-py) | Apache License 2.0 | Copyright (c) Databricks, Inc. |
 | [pydantic](https://github.com/pydantic/pydantic) | MIT License | Copyright (c) 2017 Samuel Colvin |
 | [fastapi](https://github.com/tiangolo/fastapi) | MIT License | Copyright (c) 2018 Sebastián Ramírez |
 | [uvicorn](https://github.com/encode/uvicorn) | BSD 3-Clause License | Copyright © 2017-present, Encode OSS Ltd. |
