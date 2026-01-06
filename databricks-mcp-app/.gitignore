@@ -1,0 +1,27 @@
+# Skills (copied from databricks-skills on startup)
+skills/
+
+# Projects directory (local development)
+projects/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+
+# Environment
+.env.local
+
+# Node (client)
+client/node_modules/
+client/out/
+client/dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store

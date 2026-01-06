@@ -1,13 +1,21 @@
 command:
   - "uvicorn"
-  - "app:app"
+  - "server.app:app"
   - "--host"
   - "0.0.0.0"
   - "--port"
   - "8080"
 
 env:
-  - name: LLM_ENDPOINT
-    value: "databricks-gpt-5-2"
-  - name: DATABRICKS_CONFIG_PROFILE
-    value: ""
+  - name: ENV
+    value: "production"
+  - name: PROJECTS_BASE_DIR
+    value: "./projects"
+  - name: ENABLED_SKILLS
+    value: "databricks-python-sdk,sdp,synthetic-data-generation"
+  # Database - set LAKEBASE_PG_URL via app secrets
+  # - name: LAKEBASE_PG_URL
+  #   valueFrom:
+  #     secretKeyRef:
+  #       name: lakebase-pg-url
+  #       key: url

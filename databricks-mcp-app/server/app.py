@@ -1,0 +1,105 @@
+"""FastAPI app for the Claude Code MCP application."""
+
+import asyncio
+import logging
+import os
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+from dotenv import load_dotenv
+from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from starlette.middleware.cors import CORSMiddleware
+
+from .db import is_postgres_configured, run_migrations, init_database
+from .routers import agent_router, config_router, conversations_router, projects_router
+from .services.backup_manager import start_backup_worker, stop_backup_worker
+from .services.skills_manager import copy_skills_to_app
+
+# Configure logging
+logging.basicConfig(
+  level=logging.INFO,
+  format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+  handlers=[
+    logging.StreamHandler(),
+  ],
+)
+
+logger = logging.getLogger(__name__)
+
+# Load environment variables
+env_local_loaded = load_dotenv(dotenv_path='.env.local')
+env = os.getenv('ENV', 'development' if env_local_loaded else 'production')
+
+if env_local_loaded:
+  logger.info(f'Loaded .env.local (ENV={env})')
+else:
+  logger.info(f'Using system environment variables (ENV={env})')
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+  """Async lifespan context manager for startup/shutdown events."""
+  logger.info('Starting application...')
+
+  # Copy skills from databricks-skills to local cache
+  copy_skills_to_app()
+
+  # Initialize database if configured
+  if is_postgres_configured():
+    logger.info('Initializing database...')
+    init_database()
+
+    # Run migrations in background thread (non-blocking)
+    asyncio.create_task(asyncio.to_thread(run_migrations))
+
+    # Start backup worker
+    start_backup_worker()
+  else:
+    logger.warning(
+      'LAKEBASE_PG_URL not set - database features disabled. '
+      'Set this environment variable to enable persistence.'
+    )
+
+  yield
+
+  logger.info('Shutting down application...')
+  stop_backup_worker()
+
+
+app = FastAPI(
+  title='Claude Code MCP App',
+  description='Project-based Claude Code agent application',
+  lifespan=lifespan,
+)
+
+# Configure CORS
+allowed_origins = ['http://localhost:3000', 'http://localhost:5173'] if env == 'development' else []
+logger.info(f'CORS allowed origins: {allowed_origins}')
+
+app.add_middleware(
+  CORSMiddleware,
+  allow_origins=allowed_origins,
+  allow_credentials=True,
+  allow_methods=['*'],
+  allow_headers=['*'],
+)
+
+API_PREFIX = '/api'
+
+# Include routers
+app.include_router(config_router, prefix=API_PREFIX, tags=['configuration'])
+app.include_router(projects_router, prefix=API_PREFIX, tags=['projects'])
+app.include_router(conversations_router, prefix=API_PREFIX, tags=['conversations'])
+app.include_router(agent_router, prefix=API_PREFIX, tags=['agent'])
+
+# Production: Serve Vite static build
+build_path = Path('.') / 'client/out'
+if build_path.exists():
+  logger.info(f'Serving static files from {build_path}')
+  app.mount('/', StaticFiles(directory=str(build_path), html=True), name='static')
+else:
+  logger.warning(
+    f'Build directory {build_path} not found. '
+    'In development, run Vite separately: cd client && npm run dev'
+  )
